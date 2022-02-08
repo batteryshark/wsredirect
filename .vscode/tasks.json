@@ -1,0 +1,46 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "**Generate Build Path**",
+            "type": "shell",
+            "osx": {"command": "mkdir -p ./bin"},
+            "linux": {"command": "mkdir -p ./bin"},
+            "windows": {"command": "cmd /C if not exist bin mkdir bin"}
+        },
+        {
+            "label": "**Clean Build Path**",
+            "type": "shell",
+            "osx": {"command": "rm -rf ./bin"},
+            "linux": {"command": "rm -rf ./bin"},
+            "windows": {"command": "cmd /C if exist bin rmdir /s /q bin"},            
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "wsredirect Library [Windows 32-bit]",
+            "type": "shell",
+            "dependsOn":["**Generate Build Path**"],
+            "command": [
+                "i686-w64-mingw32-gcc",
+				"-shared",
+                "-fshort-wchar",        		
+				"${workspaceFolder}/*.c",
+                "-static",      
+                "-static-libgcc",    
+                "-lws2_32",             
+                "-o ${workspaceFolder}/bin/wsredirect.dll"				
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+	]
+}
