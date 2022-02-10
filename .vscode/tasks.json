@@ -20,11 +20,34 @@
             }
         },
         {
-            "label": "wsredirect Library [Windows 32-bit]",
+            "label": "[WIN32] wsredirect Library",
             "type": "shell",
             "dependsOn":["**Generate Build Path**"],
             "command": [
                 "i686-w64-mingw32-gcc",
+				"-shared",
+                "-fshort-wchar",        		
+				"${workspaceFolder}/*.c",
+                "-static",      
+                "-static-libgcc",    
+                "-lws2_32",             
+                "-o ${workspaceFolder}/bin/wsredirect.dll"				
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "[WIN64] wsredirect Library",
+            "type": "shell",
+            "dependsOn":["**Generate Build Path**"],
+            "command": [
+                "x86_64-w64-mingw32-gcc",
 				"-shared",
                 "-fshort-wchar",        		
 				"${workspaceFolder}/*.c",
