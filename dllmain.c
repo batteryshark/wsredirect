@@ -1,46 +1,30 @@
 #include <winsock2.h>
 #include <Windows.h>
-
-#include "cJSON.h"
-#include "win32_hook.h"
 #include "ws2tcpip.h"
-#include <stdio.h>
+
+#include "win32_hook.h"
+#include "cJSON.h"
+
 #pragma comment(lib, "ws2_32.lib")
 
-// #define _DEBUG
-
-void DBG_printf(const char* format, ...) {
-#ifdef _DEBUG
-    char s[8192];
-    va_list args;
-    memset(s, 0x00, 8192 * sizeof(s[0]));
-    va_start(args, format);
-    vsnprintf(s, 8191, format, args);
-    va_end(args);
-    s[8191] = 0;
-    OutputDebugStringA(s);
-#endif
-}
+// Our Global Redirect Config
+static cJSON* config = NULL;
 
 // Generic, load a text file stuff.
 BOOL LoadTextData(const char* path, char** buffer) {
-    FILE* fp = NULL;
-    fopen_s(&fp, path, "r");
-    if (!fp) { return FALSE; }
-
-    fseek(fp, 0L, SEEK_END);
-    size_t length = ftell(fp);
-    rewind(fp);
-    *buffer = (char*)malloc(length);
-    if (!*buffer) { return FALSE; }
-    fread(*buffer, length, 1, fp);
-    fclose(fp);
+    HANDLE hFile = CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+    if(!hFile){return FALSE;}
+    DWORD length = 0;
+    GetFileSize(hFile,&length);
+    *buffer = (char*)malloc(length+1);
+    if (!*buffer) { CloseHandle(hFile); return FALSE; }   
+    ReadFile(hFile,*buffer,length,NULL,NULL);
+    CloseHandle(hFile);
     return TRUE;
 
 }
 
-cJSON* config = NULL;
-// getaddrinfo
+// Check for an entry match and redirect if so.
 int x_getaddrinfo(PCSTR pNodeName, PCSTR pServiceName, const ADDRINFOA * pHints, PADDRINFOA * ppResult)
 {
 
@@ -74,36 +58,31 @@ int x_getaddrinfo(PCSTR pNodeName, PCSTR pServiceName, const ADDRINFOA * pHints,
         redirected_host = cJSON_GetObjectItemCaseSensitive(entry, "ip")->valuestring;
     }
 
-    // Make the Necessary Adjustments
-   // cJSON_Delete(entry);
-    DBG_printf("Redirecting: %s -> %s:%s", sname, redirected_host, redirected_port);
     return getaddrinfo(redirected_host, redirected_port, pHints, ppResult);
 
 }
 
 
 void init_wsr() {
+    // Load Redirect Configuration
     char* cdata = NULL;
     LoadTextData("wsr.config", &cdata);
     config = cJSON_Parse(cdata);
+    // Hook getaddrinfo
+    iat_hook(GetModuleHandleA(NULL), "WS2_32.DLL", GetProcAddress(GetModuleHandleA("ws2_32.dll"), "getaddrinfo"), x_getaddrinfo);
 }
 
 // Entry-Point Function
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-    if (fdwReason == DLL_PROCESS_ATTACH) {
-        init_wsr();
-        void* o_getaddrinfo_addr = GetProcAddress(GetModuleHandleA("ws2_32.dll"), "getaddrinfo");
-        if (!iat_hook(GetModuleHandleA(NULL), "WS2_32.DLL", o_getaddrinfo_addr, x_getaddrinfo)) {
-            DBG_printf("Failed to Hook GetAddrInfo");
-            exit(-1);
-        }
+    switch(fdwReason){
+        case DLL_PROCESS_ATTACH:
+            init_wsr();
+        case DLL_PROCESS_DETACH:
+            break;
+
     }
-
-    if (fdwReason == DLL_PROCESS_DETACH) {}
     return TRUE;
-
 }
-
 
 // Piggyback Function
 void __declspec(dllexport) wsr(void) {}
